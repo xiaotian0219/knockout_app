@@ -1,0 +1,141 @@
+<h2>The time is now <span data-bind="text: time"></span></h2>
+
+<h1>Listing users</h1>
+
+<%= link_to 'Sort by name', nil, :onclick => 'viewModel.sortByName(); return false;' %> |
+<%= link_to 'Sort by email', nil, :onclick => 'viewModel.sortByEmail(); return false;' %>
+
+<span data-bind="visible: loading()"><em>Loading</em></span>
+
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Email</th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody data-bind='template: { name: "userTemplate", foreach: last5 }'>
+  </tbody>
+</table>
+
+<br>
+
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Email</th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody data-bind='template: { name: "userTemplate", foreach: filteredUsers }'>
+  </tbody>
+</table>
+
+<br>
+
+<form>
+  <label>Filter name</label>
+  <input name="name_filter" />
+  <button onclick="javascript: viewModel.userFilters.push($(this).parent().find('input').val()); $(this).parent().find('input').val(''); return false;">Filter</button>
+</form>
+
+<br>
+<div data-bind="visible: userFilters().length > 0">
+  Filtered: <div data-bind="text: userFilters()"></div>
+  <a href="#" onclick="javascript: viewModel.userFilters.pop(); return false;">
+    Remove last filter
+  </a>
+</div>
+
+<br />
+
+<%= link_to 'New User', new_user_path %>
+
+<script type="text/html" charset="utf-8" id="userTemplate">
+  <tr>
+    <td>${ user.name }</td>
+    <td>${ user.email }</td>
+    <td><%= link_to 'Show', user_path_js('${user.id}') %></td>
+    <td><%= link_to 'Edit', edit_user_path_js('${user.id}') %></td>
+    <td><%= link_to 'Destroy', user_path_js('${user.id}'), :confirm => 'Are you sure?', :method => :delete %></td>
+  </tr>
+</script>
+
+<script type="text/javascript" charset="utf-8">
+  var users = <%= raw @users.to_json %>
+
+  var viewModel = {
+    users: ko.observableArray(users),
+    userFilters: ko.observableArray([]),
+    time: ko.observable(new Date()),
+    loading: ko.observable(false)
+  };
+
+  viewModel.sortByName = function() {
+    viewModel.users.sort(function(a, b) {
+      return (a.user.name > b.user.name ? 1 : -1);
+    });
+  };
+
+  viewModel.sortByEmail = function() {
+    viewModel.users.sort(function(a, b) {
+      return (a.user.email > b.user.email ? 1 : -1);
+    });
+  };
+
+  viewModel.userIds = ko.dependentObservable(function() {
+    return $.map(viewModel.users(), function(user) {
+      return user.user.id
+    });
+  }, viewModel);
+
+  viewModel.filteredUsers = ko.dependentObservable(function() {
+    return $.grep(this.users(), function(element) {
+      return $.inArray(element.user.name, viewModel.userFilters()) < 0;
+    });
+  }, viewModel);
+
+
+  viewModel.last5 = ko.dependentObservable(function() {
+    return viewModel.filteredUsers().slice(-5);
+  }, viewModel);
+
+  viewModel.filteredUsers.subscribe(function(users) {
+    try { console.log('There\'s now ' + users.length + ' users visible'); }
+    catch(e) {}
+  });
+
+  viewModel.users.subscribe(function(users) {
+    try { console.log('There\'s now ' + users.length + ' users total'); }
+    catch(e) {}
+  });
+
+  function updateTime() {
+    viewModel.time(new Date());
+  };
+
+  function loadUsers() {
+    viewModel.loading(true);
+    $.getJSON('/users.json', function(data) {
+      var userIds = viewModel.userIds();
+      var users = $.grep(data, function(elem) {
+        return $.inArray(elem.user.id, userIds) == -1;
+      });
+      $.each(users, function(index, user) {
+        viewModel.users.push(user);
+      });
+      viewModel.loading(false);
+    });
+  };
+
+  ko.applyBindings(viewModel);
+  
+  setInterval('loadUsers()',3000);
+  setInterval('updateTime()',1000);
+</script>
